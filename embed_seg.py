@@ -20,7 +20,7 @@ class EmbedSegModel(nn.Module):
     def forward(self, x):
         z = self.encoder(x)
 
-        return F.tanh(self.curv_branch(z))
+        return F.sigmoid(self.curv_branch(z))
 
         # instance_branch = self.instance_branch(z)
         #

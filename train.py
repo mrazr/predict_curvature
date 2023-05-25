@@ -24,7 +24,7 @@ import embed_seg
 
 @hydra.main(config_path='experiments', config_name='config.yaml')
 def train(cfg: DictConfig):
-    ds = ctc_dataset.CTCDataset(Path('F:/CTCDatasets/PhC-C2DH-U373'), 'CURV')
+    ds = ctc_dataset.CTCDataset(Path(cfg.dataset_path), 'CURV_HEAT_MAPS')
 
     train_ds, val_ds = torch.utils.data.random_split(ds, [0.9, 0.1])
     # train_ds = TrainDataset(train_ds)
@@ -43,7 +43,7 @@ def train(cfg: DictConfig):
     best_val_loss = 99999999
 
     wandb.login()
-    wandb.init(project='curv_predict_test', config=OmegaConf.to_container(cfg, resolve=True))
+    wandb.init(project='curv_heat_map_predict_test', config=OmegaConf.to_container(cfg, resolve=True))
 
     for epoch in tqdm(range(epochs), desc='Epoch'):
         model.train()
@@ -103,7 +103,7 @@ def train(cfg: DictConfig):
                 # val_seed_loss += seed_loss.detach().cpu()
                 # val_smooth_loss += smooth_loss.detach().cpu()
             if (epoch + 1) % cfg.visualization_frequency == 0:
-                imgs, _ = random.choice(val_ds)
+                imgs, anns = random.choice(val_ds)
                 imgs = torch.unsqueeze(imgs, dim=0)
 
                 imgs = imgs.to(dev)
@@ -111,6 +111,8 @@ def train(cfg: DictConfig):
                 curv_maps = model(imgs)
 
                 curv_map = np.squeeze(curv_maps[0].cpu().numpy())
+
+                target_map = np.squeeze(anns[0].cpu().numpy())
 
                 # seed_map = np.squeeze(seed_maps[0].cpu().numpy())
                 # offset_map = np.squeeze(offset_maps[0].cpu().numpy())
@@ -125,12 +127,15 @@ def train(cfg: DictConfig):
                 # cluster_vis = visualize.visualize_clusters([instance.cluster for instance in instances], img)
                 # instance_vis = visualize.visualize_instances(instances, img)
 
-                fig, axs = plt.subplots(1, 2, figsize=(30, 12))
+                fig, axs = plt.subplots(1, 3, figsize=(20, 8))
                 axs[0].imshow(img)
                 axs[0].set_title('image')
 
-                axs[1].imshow(curv_map)
-                axs[1].set_title('curvinness')
+                axs[1].imshow(target_map)
+                axs[1].set_title('curv heat target')
+
+                axs[2].imshow(curv_map)
+                axs[2].set_title('curv heat pred')
 
                 # axs[2].imshow(sigma_map[0, :, :])
                 # axs[2].set_title('sigmas y')
@@ -162,6 +167,7 @@ def train(cfg: DictConfig):
                 grid_wdb = wandb.Image(data)
                 img_wdb = wandb.Image(img)
                 curv_wdb = wandb.Image(np.squeeze(curv_map))
+                targ_wdb = wandb.Image(np.squeeze(target_map))
                 # sigmay_wdb = wandb.Image(np.squeeze(sigma_map[0, :, :]))
                 # sigmax_wdb = wandb.Image(np.squeeze(sigma_map[1, :, :]))
                 # offset_vis_wdb = wandb.Image(offset_vis_overlay)
@@ -170,7 +176,8 @@ def train(cfg: DictConfig):
 
                 wandb.log({'visualization': grid_wdb,
                            'img': img_wdb,
-                           'curv': curv_wdb
+                           'curv targ': targ_wdb,
+                           'curv heat map': curv_wdb
                            }, step=epoch)
 
         val_epoch_loss = val_epoch_loss / len(val_dl)
