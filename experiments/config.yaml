@@ -1,0 +1,7 @@
+dataset_path: ???
+epochs: 200
+batch_size: 4
+optimizer:
+  lr:
+    initial_value: 0.0005
+visualization_frequency: 5
